@@ -55,27 +55,26 @@ def is_valid(potential_neighbor: list[int], left_neighbor: list[int]=[None], top
 def solve_puzzle(input_cards: list[list[int]], grid_size: int) -> list[list[int]]:
     
     ans = [[None for _ in range(grid_size)] for _ in range(grid_size)]
-    unused_tiles = {i: input_cards[i] for i in range(len(input_cards))}
-    used_tiles = set()
+    used_tiles = [False] * grid_size**2
     
     pos = 0 
 
     def dfs_for_grid(pos):
         
-        if len(used_tiles) == grid_size**2:
+        if pos == grid_size**2:
             return True
         
         i = pos // grid_size
         j = pos % grid_size
 
-        rot = 0
-        card_idx = 0
-
         res = False
 
-        for card_idx in list(unused_tiles.keys()):
+        for card_idx in range(len(used_tiles)):
+            
+            if used_tiles[cardr_idx]:
+                continue
 
-            card = unused_tiles[card_idx]
+            card = input_card[card_idx]
             rot = 0
 
             left_neighbor = ans[i][j-1] if j > 0 else [None]
@@ -85,15 +84,13 @@ def solve_puzzle(input_cards: list[list[int]], grid_size: int) -> list[list[int]
                 
                 if is_valid(potential_neighbor=card, left_neighbor=left_neighbor, top_neighbor=top_neighbor):
                     ans[i][j] = card
-                    used_tiles.add(card_idx)
-                    unused_tiles.pop(card_idx)
+                    used_tiles[card_idx] = True
                     res = dfs_for_grid(pos+1)
                     if res:
                         return res 
                     else:
                         ans[i][j] = None
-                        unused_tiles[card_idx] = rotate_card(card, 4-rot)
-                        used_tiles.remove(card_idx)
+                        used_tiles[card_idx] = False
                 else:
                     card = rotate_card(card, 1)
                     rot += 1
@@ -103,7 +100,65 @@ def solve_puzzle(input_cards: list[list[int]], grid_size: int) -> list[list[int]
 
     return ans
 
+def plot_solution(arr: list[list[int]], encoding_dict: dict, title: str=None) -> None:
+
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Rectangle
     
+    rows = len(arr)
+    cols = len(arr[0])
+
+    fig, ax = plt.subplots()
+    ax.set_aspect('equal')
+
+    # --- Scale factor for diamond size ---
+    scale = 0.6  # Smaller than 1 to reduce overlap
+
+    # Plot each tile
+    for i in range(rows):
+        for j in range(cols):
+            tile_data = arr[i][j]
+
+            # Offset for tile center
+            offset_x = j * 2
+            offset_y = -i * 2
+
+            # Draw tile boundary (optional)
+            tile_box = Rectangle((offset_x - 1, offset_y - 1), 2, 2,
+                                 linewidth=1.0, edgecolor='black', facecolor='none')
+            ax.add_patch(tile_box)
+
+            # Diamond vertex positions (scaled)
+            diamond_vertices = [(scale * x, scale * y) for (x, y) in [(-1, 0), (0, 1), (1, 0), (0, -1)]]
+
+            # Diamond outline
+            diamond_path = diamond_vertices + [diamond_vertices[0]]
+            diamond_x = [x + offset_x for x, y in diamond_path]
+            diamond_y = [y + offset_y for x, y in diamond_path]
+            ax.plot(diamond_x, diamond_y, 'k--')
+
+            # Labels at vertices
+            for k, (dx, dy) in enumerate(diamond_vertices):
+                num = tile_data[k]
+                label = encoding_dict.get(num, f"?{num}")
+                ax.text(offset_x + dx, offset_y + dy, label,
+                        ha='center', va='center', fontsize=8,  # Smaller font
+                        bbox=dict(boxstyle="round,pad=0.2", edgecolor="black", facecolor="lightgray"))
+
+            # Optional: dashed box around the diamond
+            padding = scale * 1.2
+            # box = Rectangle((offset_x - padding, offset_y - padding),
+            #                 2 * padding, 2 * padding,
+            #                 linewidth=1.0, edgecolor='blue', facecolor='none', linestyle='--')
+            # ax.add_patch(box)
+
+    # Adjust plot limits
+    ax.set_xlim(-1, cols * 2 + 1)
+    ax.set_ylim(-rows * 2 - 1, 1)
+    ax.axis('off')
+    if title is not None:
+        plt.title(title)
+    plt.show()
 
 
         
