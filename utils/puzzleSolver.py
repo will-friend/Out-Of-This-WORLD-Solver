@@ -24,23 +24,51 @@ def rotate_card(card: list[int], n: int=1) -> list[int]:
     
     return card
 
-def is_valid(potential_neighbor: list[int], left_neighbor: list[int]=[None], top_neighbor: list[int]=[None]) -> bool:
+def get_all_rotations(cards: list[list[int]]) -> tuple[tuple[int]]:
     '''
-    `is_valid`: Checks if `card2_edge` is a valid neighbor of `card1_edge` by checking if connected edge share the same value.
+    `get_all_rotations`: Given a list of square card encodings, for each card, get the four rotation state representations and append them to a list. The output is a tuple containing tuples for each card containing tuples of the rotated encodings. Rotations are done clockwise by 90 degrees
+
+    Inputs
+    ------
+    `cards : list[list[int]]`
+    - list of all card encodings to calculate rotations for
+    
+    Returns
+    -------
+    `cards_all_rot : tuple[tuple[tuple[int]]]`
+    - input card rotated n times 90 degrees clockwise
+    '''
+    
+    cards_all_rots = []
+    for card in cards:
+        rots = [tuple(card)]
+        for _ in range(3):
+            rots.append(tuple(card[-1:] + card[:-1]))
+        
+        cards_all_rots.append(tuple(rots))
+        
+    return tuple(cards_all_rots)
+            
+def is_valid(potential_neighbor: tuple[int], left_neighbor: tuple[int]=[None], top_neighbor: tuple[int]=tuple[None]) -> bool:
+    '''
+    `is_valid`: Checks if `potential_neighbor` is a valid neighbor of 'left_neighbor` and `top_neighbor` by checking if connected edges share the same value.
     Returns `True` if so, otherwise it returns `False`
 
     Inputs
     ------
-    `card1_edge : list[int]`
-    - Card edge, already determined to be valid, we wish to compare `card2_edge` against
+    `potential_neighbor : tuple[int]`
+    - Card we are testing as a potential solution for the tile position $(i,j)$
     
-    `card2_edge : list[int]`
-    - Card edge from card we are testing as possible neighbor to `card1_edge`
+    `left_neighbor : tuple[int]`
+    - The card at position $(i,j-1)$ relative to the `potential_neighor`
+    
+    `top_neighbor : tuple[int]`
+    - The card at position $(i-1,j)$ relative to the `potential_neighor`
 
     Returns
     -------
     `bool`
-    - `True` if `card2_edge` is a valid neighbor to `card1_edge`, otherwise returns `False`
+    - `True` if `potential_neighbor` has matching left and top edges to the right and bottom edges of `left_neighbor` and `top_neighbor`, respectively. If no top or left neighbor is present we consider the condition for that neighbor met.
     '''
     if left_neighbor[0] is None and top_neighbor[0] is None:
         return True
@@ -53,14 +81,43 @@ def is_valid(potential_neighbor: list[int], left_neighbor: list[int]=[None], top
 
 
 def solve_puzzle(input_cards: list[list[int]], grid_size: int) -> list[list[int]]:
+    '''
+    `solve_puzzle`: Given a list of `input_cards`, where each entry in the list is a list encoding a 4-side tile with symbols from left, top, right, bottom, and a `grid_size` for the final MxM solution, use DFS with pruning to find a grid where al tiles have matching edges.
+    
+    Inputs
+    ------
+    `input_cards : list[list[int]]`
+    - List of input tiles, with encoded values representing the symbol on each edge
+    
+    `grid_size : int`
+    - An integer representing the side length of the the MxM grid that we want to solve for.
+    
+    Returns
+    -------
+    `ans : list[list[int]]`
+    - MxM array representing the solved state of the puzzle. All entries are `None` if no solution was found. 
+    '''
     
     ans = [[None for _ in range(grid_size)] for _ in range(grid_size)]
+    all_rots = get_all_rotations(input_cards)
     used_tiles = [False] * grid_size**2
     
     pos = 0 
 
-    def dfs_for_grid(pos):
+    def dfs_for_grid(pos: int) -> bool:
+        '''
+        `dfs_for_grid`: Given a position index, find a valid tile in the edge-matching puzzle for teh current position using a Depth First Search implementation with pruning. Recursively search for more solutions when one is found for the current `pos` input. The position in the grid we are trying to fill is colculated by doing the integer division between the grid size of our solution for the row values, and the modulo with the grid size of our solution, with respectto `pos`
         
+        Inputs
+        ------
+        `pos : int`
+        - Integer representing the current number tile position we are trying to find a solution for. Used to calculate the row, column values we are at.
+        
+        Returns
+        -------
+        `res : bool`
+        - Returns `True` if we have found a solution, otherwise returns `False`
+        '''
         if pos == grid_size**2:
             return True
         
@@ -71,16 +128,16 @@ def solve_puzzle(input_cards: list[list[int]], grid_size: int) -> list[list[int]
 
         for card_idx in range(len(used_tiles)):
             
-            if used_tiles[cardr_idx]:
+            if used_tiles[card_idx]:
                 continue
 
-            card = input_card[card_idx]
-            rot = 0
+            rotations = all_rots[card_idx]
 
             left_neighbor = ans[i][j-1] if j > 0 else [None]
-            top_neighbor = ans[i-1][j] if i > 0 else [None] 
+            top_neighbor = ans[i-1][j] if i > 0 else [None]
 
-            while rot < 4:
+            for rot in range(4):
+                card = rotations[rot]
                 
                 if is_valid(potential_neighbor=card, left_neighbor=left_neighbor, top_neighbor=top_neighbor):
                     ans[i][j] = card
@@ -91,9 +148,6 @@ def solve_puzzle(input_cards: list[list[int]], grid_size: int) -> list[list[int]
                     else:
                         ans[i][j] = None
                         used_tiles[card_idx] = False
-                else:
-                    card = rotate_card(card, 1)
-                    rot += 1
         return res
     
     res = dfs_for_grid(pos)
@@ -101,7 +155,22 @@ def solve_puzzle(input_cards: list[list[int]], grid_size: int) -> list[list[int]
     return ans
 
 def plot_solution(arr: list[list[int]], encoding_dict: dict, title: str=None) -> None:
-
+    '''
+    `plot_solutions`: given a solution space for the MxM edge matching puzzle, and an encoding dictionary mapping number to symbol, visualize the grid with the edges of each tile.
+    
+    Inputs
+    ------
+    `arr : list[list[int]]`
+    - Solved grid to the matching-edge puzzle
+    
+    `encoding_dict : dict`
+    - Dictionary mapping the values in teh solution array to symbols to visualize puzzle edges.
+    
+    Returns
+    -------
+    `None`
+    '''
+    
     import matplotlib.pyplot as plt
     from matplotlib.patches import Rectangle
     
@@ -111,33 +180,26 @@ def plot_solution(arr: list[list[int]], encoding_dict: dict, title: str=None) ->
     fig, ax = plt.subplots()
     ax.set_aspect('equal')
 
-    # --- Scale factor for diamond size ---
-    scale = 0.6  # Smaller than 1 to reduce overlap
+    scale = 0.6
 
-    # Plot each tile
     for i in range(rows):
         for j in range(cols):
             tile_data = arr[i][j]
 
-            # Offset for tile center
             offset_x = j * 2
             offset_y = -i * 2
 
-            # Draw tile boundary (optional)
             tile_box = Rectangle((offset_x - 1, offset_y - 1), 2, 2,
                                  linewidth=1.0, edgecolor='black', facecolor='none')
             ax.add_patch(tile_box)
 
-            # Diamond vertex positions (scaled)
             diamond_vertices = [(scale * x, scale * y) for (x, y) in [(-1, 0), (0, 1), (1, 0), (0, -1)]]
 
-            # Diamond outline
             diamond_path = diamond_vertices + [diamond_vertices[0]]
             diamond_x = [x + offset_x for x, y in diamond_path]
             diamond_y = [y + offset_y for x, y in diamond_path]
             ax.plot(diamond_x, diamond_y, 'k--')
 
-            # Labels at vertices
             for k, (dx, dy) in enumerate(diamond_vertices):
                 num = tile_data[k]
                 label = encoding_dict.get(num, f"?{num}")
@@ -145,14 +207,6 @@ def plot_solution(arr: list[list[int]], encoding_dict: dict, title: str=None) ->
                         ha='center', va='center', fontsize=8,  # Smaller font
                         bbox=dict(boxstyle="round,pad=0.2", edgecolor="black", facecolor="lightgray"))
 
-            # Optional: dashed box around the diamond
-            padding = scale * 1.2
-            # box = Rectangle((offset_x - padding, offset_y - padding),
-            #                 2 * padding, 2 * padding,
-            #                 linewidth=1.0, edgecolor='blue', facecolor='none', linestyle='--')
-            # ax.add_patch(box)
-
-    # Adjust plot limits
     ax.set_xlim(-1, cols * 2 + 1)
     ax.set_ylim(-rows * 2 - 1, 1)
     ax.axis('off')
